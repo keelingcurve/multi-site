@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Keeling Curve Foundation data tools</title>
+  <meta name="description" content="Ten data tools from the Keeling Curve Foundation and collaborators, side by side in one viewer.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #e8eef2;
+      --muted: #8fa3b0;
+      --deep: #0d1b24;
+      --panel: #132631;
+      --line: #23404f;
+      --accent: #6cc3d5;
+      --bar-h: 48px;
+      color-scheme: dark;
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: inherit; margin: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--deep);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top bar */
+    .bar {
+      height: var(--bar-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .bar h1 { font-size: 15px; font-weight: 600; white-space: nowrap; }
+    .bar h1 a { color: inherit; text-decoration: none; }
+    .switcher {
+      display: none;
+      flex: 1;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    body.is-focused .switcher { display: flex; }
+    .switcher button {
+      font: inherit;
+      font-size: 13px;
+      white-space: nowrap;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .switcher button:hover { color: var(--ink); border-color: var(--line); }
+    .switcher button[aria-current="true"] { color: var(--deep); background: var(--accent); }
+    .bar .spacer { flex: 1; }
+    body.is-focused .bar .spacer { display: none; }
+    .bar .source { font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .bar .source:hover { color: var(--ink); }
+    .show-all {
+      display: none;
+      font: inherit;
+      font-size: 13px;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    body.is-focused .show-all { display: inline-block; }
+
+    /* Grid: 2 columns x 5 rows */
+    .grid {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(5, minmax(240px, 1fr));
+    }
+    body.is-focused .grid {
+      overflow: hidden;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+
+    .panel {
+      grid-column: var(--col);
+      grid-row: var(--row);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    body.is-focused .panel { display: none; }
+    body.is-focused .panel.is-current { display: flex; grid-column: 1; grid-row: 1; }
+
+    .panel header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px 6px 12px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .panel h2 {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .panel h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+    .panel .act {
+      font: inherit;
+      font-size: 12px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 3px 8px;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .panel .act:hover { color: var(--deep); background: var(--accent); border-color: var(--accent); }
+    body.is-focused .panel .act.expand { display: none; }
+
+    .panel iframe {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      background: #fff;
+      display: block;
+    }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Phones and narrow windows: one column, column 1 then column 2 */
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: 75vh; }
+      .panel { grid-column: auto; grid-row: auto; }
+      .bar .source { display: none; }
+      .bar h1 { font-size: 14px; }
+      body.is-focused .bar h1 { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <h1><a href="./">Keeling Curve Foundation data tools</a></h1>
+    <nav class="switcher" aria-label="Switch tool"></nav>
+    <span class="spacer"></span>
+    <button class="show-all" type="button">Show all ten</button>
+    <a class="source" href="https://github.com/keelingcurve/multi-site">About this viewer</a>
+  </div>
+
+  <main class="grid" id="grid"></main>
+
+  <script>
+    // The ten sites, in grid order. To add, remove, or move a site, edit this list only.
+    // col and row give the position in the 2 x 5 desktop grid.
+    // On narrow screens the panels stack in list order (column 1, then column 2).
+    const SITES = [
+      { id: "kcf",          col: 1, row: 1, title: "KCF hero mockup",                    url: "https://sdiggs.github.io/kcf/" },
+      { id: "kcf-lto",      col: 1, row: 2, title: "Climate & Ocean Data (KCF LTO)",     url: "https://sdiggs.github.io/kcf-lto-data/" },
+      { id: "pull-the-plug",col: 1, row: 3, title: "Pull the Plug",                      url: "https://keelingcurve.github.io/pull-the-plug/" },
+      { id: "stewardship",  col: 1, row: 4, title: "Climate Data Stewardship Landscape", url: "https://sdiggs.github.io/climate_data_players/" },
+      { id: "lter",         col: 1, row: 5, title: "LTER Network",                       url: "https://keelingcurve.github.io/lter/" },
+      { id: "argo",         col: 2, row: 1, title: "Argo Knowledge Graph",               url: "https://sdiggs.github.io/argo_kg_explorer/" },
+      { id: "ioos",         col: 2, row: 2, title: "IOOS Plankton Knowledge Graph",      url: "https://sdiggs.github.io/ioos-plankton-kg/" },
+      { id: "rstar",        col: 2, row: 3, title: "R* calculator",                      url: "https://sdiggs.github.io/rstar-calculator/" },
+      { id: "uredi",        col: 2, row: 4, title: "UReDI calculator",                   url: "https://sdiggs.github.io/uredi-calculator/" },
+      { id: "parsons",      col: 2, row: 5, title: "Parsons Matrix",                     url: "https://nyce-data.github.io/parsons-matrix/", note: "NYCE" }
+    ];
+
+    const grid = document.getElementById("grid");
+    const switcher = document.querySelector(".switcher");
+    const showAll = document.querySelector(".show-all");
+    const panels = {};
+    const tabs = {};
+
+    for (const s of SITES) {
+      const panel = document.createElement("section");
+      panel.className = "panel";
+      panel.id = "panel-" + s.id;
+      panel.style.setProperty("--col", s.col);
+      panel.style.setProperty("--row", s.row);
+      panel.setAttribute("aria-label", s.title);
+
+      const header = document.createElement("header");
+      const h2 = document.createElement("h2");
+      h2.textContent = s.title;
+      if (s.note) {
+        const small = document.createElement("small");
+        small.textContent = s.note;
+        h2.appendChild(small);
+      }
+
+      const expand = document.createElement("button");
+      expand.type = "button";
+      expand.className = "act expand";
+      expand.textContent = "Expand";
+      expand.addEventListener("click", () => focusSite(s.id));
+
+      const open = document.createElement("a");
+      open.className = "act";
+      open.href = s.url;
+      open.target = "_blank";
+      open.rel = "noopener";
+      open.textContent = "Open in new tab";
+
+      header.append(h2, expand, open);
+
+      const frame = document.createElement("iframe");
+      frame.title = s.title;
+      frame.src = s.url;
+      frame.loading = "lazy";
+      frame.allow = "fullscreen; clipboard-write";
+      frame.referrerPolicy = "no-referrer-when-downgrade";
+
+      panel.append(header, frame);
+      grid.appendChild(panel);
+      panels[s.id] = panel;
+
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.textContent = s.title;
+      tab.addEventListener("click", () => focusSite(s.id));
+      switcher.appendChild(tab);
+      tabs[s.id] = tab;
+    }
+
+    function focusSite(id, fromHash) {
+      if (!panels[id]) return unfocus(fromHash);
+      document.body.classList.add("is-focused");
+      for (const key in panels) {
+        const on = key === id;
+        panels[key].classList.toggle("is-current", on);
+        tabs[key].setAttribute("aria-current", on ? "true" : "false");
+      }
+      // Load the iframe now in case lazy loading skipped it while it was off screen.
+      const frame = panels[id].querySelector("iframe");
+      if (frame.loading === "lazy") frame.loading = "eager";
+      tabs[id].scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (!fromHash && location.hash !== "#" + id) location.hash = id;
+    }
+
+    function unfocus(fromHash) {
+      document.body.classList.remove("is-focused");
+      for (const key in panels) panels[key].classList.remove("is-current");
+      if (!fromHash && location.hash) history.replaceState(null, "", location.pathname + location.search);
+    }
+
+    showAll.addEventListener("click", () => unfocus(false));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.body.classList.contains("is-focused")) unfocus(false);
+    });
+
+    function fromHash() {
+      const id = location.hash.slice(1);
+      if (id) focusSite(id, true); else unfocus(true);
+    }
+    window.addEventListener("hashchange", fromHash);
+    fromHash();
+  </script>
+</body>
+</html>
